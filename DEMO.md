@@ -12,6 +12,13 @@ and the rules loaded.
 - `src/service_metrics/legacy_report.py`: ~60 lines of ABC, registry, factory, and config
   dict that produce a table 10 lines could. Works, untested, no docstrings.
 
+## Opening (2 min)
+
+Open `dashboard.html` in a browser. It is the business view: requests received, percent
+closed, open backlog, median days to close against a 5-day target. Then run `make run`.
+The CLI says Parks takes 980 days; the dashboard says 4. Do not explain why yet. That gap
+is demo 3.
+
 ## 1. No shared standards
 
 Pain: AI-padded commits and PRs, over-built architecture, every teammate has a different bar.

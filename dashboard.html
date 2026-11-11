@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>311 Service Performance</title>
+<style>
+  :root { --bg:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --grid:#e1e0d9; --card:#ffffff; --accent:#2a78d6; --accent-soft:#cde2fb; --warn:#eda100; --bad:#c62828; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --grid:#2c2c2a; --card:#232322; --accent:#3987e5; --accent-soft:#1c5cab; --warn:#c98500; --bad:#e06060; } }
+  :root[data-theme="dark"] { --bg:#1a1a19; --ink:#f0efec; --ink2:#c3c2b7; --grid:#2c2c2a; --card:#232322; --accent:#3987e5; --accent-soft:#1c5cab; --warn:#c98500; --bad:#e06060; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; max-width:960px; margin-inline:auto; }
+  h1 { font-size:22px; margin:0 0 4px; } .sub { color:var(--ink2); margin:0 0 20px; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:20px; }
+  .tile { background:var(--card); border:1px solid var(--grid); border-radius:8px; padding:14px 16px; }
+  .tile .label { color:var(--ink2); font-size:13px; } .tile .value { font-size:32px; font-weight:600; margin-top:2px; }
+  .tile .note { color:var(--ink2); font-size:12px; margin-top:4px; }
+  .charts { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--grid); border-radius:8px; padding:14px 16px; }
+  .card h2 { font-size:15px; margin:0 0 2px; } .card p { color:var(--ink2); font-size:12px; margin:0 0 10px; }
+  .row { display:grid; grid-template-columns:90px 1fr 44px; align-items:center; gap:8px; margin:6px 0; font-size:13px; }
+  .track { height:14px; background:var(--grid); border-radius:4px; overflow:hidden; }
+  .fill { height:100%; background:var(--accent); border-radius:0 4px 4px 0; }
+  .fill.slow { background:var(--warn); } .fill.bad { background:var(--bad); }
+  .row b { text-align:right; font-variant-numeric:tabular-nums; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } th,td { padding:6px 8px; border-bottom:1px solid var(--grid); text-align:right; }
+  th:first-child, td:first-child { text-align:left; } th { color:var(--ink2); font-weight:500; }
+  .foot { color:var(--ink2); font-size:12px; margin-top:16px; }
+</style>
+</head>
+<body>
+<h1>311 Service Performance</h1>
+<p class="sub">Service requests by department, March 2024. Source: <code>data/sample_311.csv</code>.</p>
+<div class="tiles" id="tiles"></div>
+<div class="charts">
+  <div class="card"><h2>Median days to close</h2><p>Closed requests only. Target: 5 days.</p><div id="median"></div></div>
+  <div class="card"><h2>Open backlog</h2><p>Requests still open, by department.</p><div id="backlog"></div></div>
+</div>
+<div class="card"><h2>Department detail</h2><table id="table"><thead><tr><th>Department</th><th>Requests</th><th>Closed</th><th>% closed</th><th>Open</th><th>Median days</th></tr></thead><tbody></tbody></table></div>
+<p class="foot">Open requests are excluded from the median. Including them would measure each one to today and inflate the figure.</p>
+<script>
+const CSV = `id,department,opened_at,closed_at,status
+1,Parks,2024-03-01,2024-03-04,closed
+2,Parks,2024-03-02,,open
+3,Parks,2024-03-03,2024-03-07,closed
+4,Parks,2024-03-04,,open
+5,Parks,2024-03-05,,open
+6,Parks,2024-03-06,,open
+7,Parks,2024-03-07,2024-03-10,closed
+8,Streets,2024-03-01,2024-03-11,closed
+9,Streets,2024-03-02,2024-03-10,closed
+10,Streets,2024-03-03,2024-03-13,closed
+11,Streets,2024-03-04,2024-03-12,closed
+12,Streets,2024-03-05,,open
+13,Streets,2024-03-06,2024-03-16,closed
+14,Water,2024-03-01,2024-03-02,closed
+15,Water,2024-03-02,2024-03-03,closed
+16,Water,2024-03-03,2024-03-05,closed
+17,Water,2024-03-04,2024-03-05,closed
+18,Water,2024-03-05,2024-03-07,closed
+19,Water,2024-03-06,2024-03-07,closed
+20,Sanitation,2024-03-01,2024-03-03,closed
+21,Sanitation,2024-03-02,2024-03-04,closed
+22,Sanitation,2024-03-03,,open
+23,Sanitation,2024-03-04,2024-03-06,closed
+24,Sanitation,2024-03-05,2024-03-08,closed
+25,Sanitation,2024-03-06,2024-03-07,closed`;
+const TARGET_DAYS = 5;
+const rows = CSV.trim().split("\n").slice(1).map(l => { const [id, dept, opened, closed] = l.split(","); return { dept, opened: new Date(opened), closed: closed ? new Date(closed) : null }; });
+const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const days = r => (r.closed - r.opened) / 86400000;
+const depts = [...new Set(rows.map(r => r.dept))].sort().map(d => {
+  const rs = rows.filter(r => r.dept === d), closed = rs.filter(r => r.closed);
+  return { d, n: rs.length, closed: closed.length, open: rs.length - closed.length, pct: 100 * closed.length / rs.length, med: median(closed.map(days)) };
+});
+const total = rows.length, open = rows.filter(r => !r.closed).length, allMed = median(rows.filter(r => r.closed).map(days));
+const tile = (label, value, note) => `<div class="tile"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
+document.getElementById("tiles").innerHTML =
+  tile("Requests received", total, "4 departments") +
+  tile("Closed", (100 * (total - open) / total).toFixed(0) + "%", `${total - open} of ${total}`) +
+  tile("Open backlog", open, open ? depts.filter(x => x.open).map(x => x.d).join(", ") : "none") +
+  tile("Median days to close", allMed.toFixed(1), allMed <= TARGET_DAYS ? "within 5-day target" : "above 5-day target");
+const bars = (el, items, key, max, cls) => document.getElementById(el).innerHTML = items.map(x => `<div class="row" title="${x.d}: ${x[key]}"><span>${x.d}</span><div class="track"><div class="fill ${cls(x[key])}" style="width:${100 * x[key] / max}%"></div></div><b>${typeof x[key] === "number" && !Number.isInteger(x[key]) ? x[key].toFixed(1) : x[key]}</b></div>`).join("");
+bars("median", [...depts].sort((a, b) => b.med - a.med), "med", Math.max(TARGET_DAYS, ...depts.map(x => x.med)), v => v > 2 * TARGET_DAYS ? "bad" : v > TARGET_DAYS ? "slow" : "");
+bars("backlog", [...depts].sort((a, b) => b.open - a.open), "open", Math.max(1, ...depts.map(x => x.open)), v => v >= 3 ? "slow" : "");
+document.querySelector("#table tbody").innerHTML = depts.map(x => `<tr><td>${x.d}</td><td>${x.n}</td><td>${x.closed}</td><td>${x.pct.toFixed(1)}</td><td>${x.open}</td><td>${x.med.toFixed(1)}</td></tr>`).join("");
+</script>
+</body>
+</html>
