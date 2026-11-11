@@ -2,7 +2,7 @@
 
 Exit code 2 blocks the stop and feeds stderr back to Claude as its next instruction.
 `stop_hook_active` is true when this hook already forced a continuation, so we
-let that turn end to avoid an infinite loop.
+let that turn end to avoid an infinite loop. Skips silently if pytest is missing.
 """
 
 import json
@@ -20,6 +20,10 @@ def main() -> int:
         return 0
     cwd = payload.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
     if not os.path.exists(os.path.join(cwd, "tests")):
+        return 0
+    # Skip silently if this interpreter has no pytest, rather than block on a setup problem.
+    probe = subprocess.run([sys.executable, "-c", "import pytest"], capture_output=True)
+    if probe.returncode != 0:
         return 0
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "-q"],
