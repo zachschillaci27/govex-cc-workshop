@@ -14,10 +14,10 @@ and the rules loaded.
 
 ## Opening (2 min)
 
-Open `dashboard.html` in a browser. It is the business view: requests received, percent
-closed, open backlog, median days to close against a 5-day target. Then run `make run`.
-The CLI says Parks takes 980 days; the dashboard says 4. Do not explain why yet. That gap
-is demo 3.
+Run `make run`, then open `dashboard.html` in a browser. It is the business view: requests
+received, percent closed, open backlog, median days to close against a 5-day target. Parks
+shows a red bar at 980 days. Say only: "this is what the city manager would see." Do not
+explain why yet. That number is demo 3.
 
 ## 1. No shared standards
 
@@ -71,6 +71,7 @@ Audience should see:
    prints the pytest summary back to it. Say out loud: "That was the hook, not me."
 3. Claude filters to closed requests in `median_days_to_close`, reruns `make test`, green.
 4. The PostToolUse hook ran `ruff format` on every edited file with no prompt.
+5. Run `make run` and refresh `dashboard.html`. Parks drops from 980 to 3 days.
 
 If Claude finds the bug and fixes it in one pass, trigger the hook manually: ask it to
 "change the expected median in the new test to 99 and stop". The hook will refuse the stop.

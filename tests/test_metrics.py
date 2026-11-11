@@ -55,3 +55,13 @@ def test_median_days_for_all_closed_requests():
         req("Parks", "2024-03-01", "2024-03-10"),
     ]
     assert by_department(rows)[0].median_days_to_close == 3.0
+
+
+def test_cli_writes_dashboard_with_metrics(tmp_path, capsys):
+    from service_metrics.cli import main
+
+    out = tmp_path / "dashboard.html"
+    assert main(["data/sample_311.csv", "--html", str(out)]) == 0
+    html = out.read_text()
+    assert '"department": "Parks"' in html
+    assert "__METRICS__" not in html

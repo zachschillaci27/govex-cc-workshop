@@ -10,4 +10,4 @@ lint:
 	ruff check src tests && ruff format --check src tests
 
 run:
-	python -m service_metrics data/sample_311.csv
+	python -m service_metrics data/sample_311.csv --html dashboard.html
