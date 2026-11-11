@@ -1,0 +1,22 @@
+# Illustrative only. Needs an ANTHROPIC_API_KEY repository secret and the Claude GitHub App installed.
+# See https://code.claude.com/docs/en/github-actions
+name: Claude review
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Review this PR against CLAUDE.md. Max 5 findings ranked by severity, each with file:line and a one-line fix. No praise, no summary."
+          claude_args: "--max-turns 10"
